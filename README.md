@@ -14,11 +14,11 @@ Minima est un framework modulaire de Crawling extensible par plugins.
 
 ## Initialisation & Installation
 - python -m venv minima_env
-
-```
 Windows
 ```
-- minima_env\Scripts\Activate.ps1 
+minima_env\Scripts\Activate.ps1 
+```
+-  
 ```
 Linux & Mac
 ```
@@ -26,8 +26,8 @@ source scripts/bin/activate
 ```
 
 ```
-- pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 ```
-- python -m minima.main
+python -m minima.main
 ```
