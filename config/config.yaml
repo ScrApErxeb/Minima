@@ -1,10 +1,8 @@
 # config/config.yaml
-
+ 
 # Liste d’URLs à traiter
 urls:
-  - https://google.com
-  - https://wikipedia.org
-  - https://github.com
+  - https://fr.wikipedia.org/wiki/Burkina_Faso
 
 # Paramètres réseau
 timeout: 10

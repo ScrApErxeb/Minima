@@ -15,13 +15,14 @@ QUEUE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/qu
 PLUGIN_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "plugins"))
 
 
-def load_config():
-    logger.info(f"Tentative de chargement du fichier de config: {CONFIG_PATH}")
-    if not os.path.exists(CONFIG_PATH):
-        logger.warning(f"Config file not found: {CONFIG_PATH}")
+def load_config(config_path=None):
+    config_file = config_path or CONFIG_PATH
+    logger.info(f"Tentative de chargement du fichier de config: {config_file}")
+    if not os.path.exists(config_file):
+        logger.warning(f"Config file not found: {config_file}")
         return {}
     try:
-        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+        with open(config_file, "r", encoding="utf-8") as f:
             cfg = yaml.safe_load(f) or {}
         logger.info(f"Configuration chargée avec succès ({len(cfg)} clés)")
         return cfg
@@ -30,12 +31,12 @@ def load_config():
         return {}
 
 
-def main():
+def main(config_path: str = None):
     logger.info("=== DÉMARRAGE MINIMA v1.0 (Phase 5) ===")
 
     try:
         ensure_paths()
-        cfg = load_config()
+        cfg = load_config(config_path)
 
         # Validation et chargement sécurisé des plugins
         logger.info(f"Validation des plugins dans {PLUGIN_DIR}")
@@ -103,7 +104,7 @@ def main():
         if results:
             logger.info(f"Exportation de {len(results)} résultats")
             exporter.export_results(results)
-        else:
+        else: 
             logger.warning("Aucun résultat à exporter")
 
         logger.info("=== FIN DU PIPELINE MINIMA ===")

@@ -18,14 +18,19 @@ class PersistentQueue:
                 # Correction automatique ancienne structure
                 if "queue" in self.data:
                     self.data["pending"] = self.data.pop("queue")
-                    self._save()
-
+                
                 if "processed" not in self.data:
                     self.data["processed"] = []
 
+                # --- Synchronisation pending / processed ---
+                self.data["pending"] = [url for url in self.data["pending"] if url not in self.data["processed"]]
+
+                self._save()
+
                 logger.info(
                     f"Queue chargée depuis {self.path} "
-                    f"({len(self.data['pending'])} en attente)"
+                    f"({len(self.data['pending'])} en attente, "
+                    f"{len(self.data['processed'])} traitées)"
                 )
             except Exception as e:
                 logger.warning(f"Échec du chargement de la queue: {e}")
@@ -54,10 +59,12 @@ class PersistentQueue:
         return item
 
     def mark_processed(self, item):
+        if item in self.data["pending"]:
+            self.data["pending"].remove(item)
         if item not in self.data["processed"]:
             self.data["processed"].append(item)
             logger.info(f"Marqué comme traité: {item}")
-            self._save()
+        self._save()
 
     def is_empty(self):
         return len(self.data["pending"]) == 0

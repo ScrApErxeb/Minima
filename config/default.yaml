@@ -8,9 +8,7 @@ log_backup_count: 5
 save_mode: "incremental"    # "end" ou "incremental"
 
 urls:
-  - "https://google.com"
-  - "https://wikipedia.org"
-  - "https://github.com"
+  - https://fr.wikipedia.org/wiki/Burkina_Faso
 
 headers:
   User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)

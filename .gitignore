@@ -9,6 +9,8 @@ __pycache__/
 minima_env/
 data/
 exports/
+databases/
+crawl_data/
 
 # Distribution / packaging
 .Python
