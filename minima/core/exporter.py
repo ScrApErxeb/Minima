@@ -60,51 +60,50 @@ class Exporter:
             raise
         return path
 
-    def save_sqlite(self, data: Iterable[Mapping[str, Any]], filename: str | None = None, table_name: str = "results") -> Path:
-        """Exporte les résultats en base de données SQLite."""
-        filename = filename or f"results_{_timestamp()}.db"
-        path = self.output_db_dir / filename
-        data_list = list(data)
+    def save_sqlite(self, data: list[dict], filename: str | None = None, table_name: str = "results") -> Path:
+        """Exporte les résultats en base de données SQLite (crawl du jour)."""
 
-        try:
-            if not data_list:
-                logger.warning("No results to export in SQLite")
-                # Crée une base vide
-                conn = sqlite3.connect(path)
-                conn.close()
-                return path
+        # Nom par défaut basé sur la date du jour
+        if filename is None:
+            date_str = datetime.now().strftime("%Y%m%d")  # ex: 20251112
+            filename = f"crawl_{date_str}.db"
 
-            # Connexion à la base SQLite
-            conn = sqlite3.connect(path)
-            cursor = conn.cursor()
+        path = EXPORT_DB_DIR / filename
+        path.parent.mkdir(parents=True, exist_ok=True)
 
-            # Récupère les clés/colonnes du premier dictionnaire
-            columns = data_list[0].keys()
+        conn = sqlite3.connect(path)
+        cursor = conn.cursor()
 
-            # Crée la table avec les colonnes appropriées
-            create_table_sql = f"CREATE TABLE {table_name} ({', '.join([f'{col} TEXT' for col in columns])})"
-            cursor.execute(create_table_sql)
-
-            # Insère les données
-            placeholders = ", ".join(["?" for _ in columns])
-            insert_sql = f"INSERT INTO {table_name} VALUES ({placeholders})"
-            for record in data_list:
-                values = [str(record.get(col, "")) for col in columns]
-                cursor.execute(insert_sql, values)
-
-            conn.commit()
+        if not data:
+            # Crée la base vide si aucun résultat
             conn.close()
-            logger.info(f"SQLite export -> {path} (table: {table_name}, rows: {len(data_list)})")
-        except Exception as e:
-            logger.error(f"Export SQLite failed: {e}")
-            raise
+            return path
+
+        # Détection des colonnes à partir du premier dictionnaire
+        columns = data[0].keys()
+        col_defs = ", ".join(f"{col} TEXT" for col in columns)
+
+        # Création de la table si elle n'existe pas
+        cursor.execute(f"CREATE TABLE IF NOT EXISTS {table_name} ({col_defs})")
+
+        # Insertion ou update (upsert)
+        for row in data:
+            placeholders = ", ".join("?" for _ in columns)
+            cols = ", ".join(columns)
+            values = tuple(str(row[col]) for col in columns)
+            # Upsert: si clé unique existe, remplace l'entrée
+            cursor.execute(f"INSERT OR REPLACE INTO {table_name} ({cols}) VALUES ({placeholders})", values)
+
+        conn.commit()
+        conn.close()
         return path
 
     def export_results(self, results: Iterable[Mapping[str, Any]], prefix: str = "results") -> tuple[Path, Path, Path]:
         timestamp = _timestamp()
+        jour = datetime.now().strftime("%Y%m%d")
         json_path = self.save_json(results, f"{prefix}_{timestamp}.json")
         csv_path = self.save_csv(results, f"{prefix}_{timestamp}.csv")
-        db_path = self.save_sqlite(results, f"{prefix}_{timestamp}.db", table_name=prefix)
+        db_path = self.save_sqlite(results, f"{prefix}_{jour}.db", table_name=prefix)
         return json_path, csv_path, db_path
 
 

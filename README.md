@@ -1,6 +1,6 @@
 # Minima v0.9
 
-Minima est un framework modulaire de scraping extensible par plugins.
+Minima est un framework modulaire de Crawling extensible par plugins.
 
 ## Fonctionnalités principales
 - Système de configuration dynamique (`config/config.yaml`)
