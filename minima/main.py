@@ -1,6 +1,8 @@
 import os
 import time
 import yaml
+from minima.core.intelligence import IntelligenceManager
+from minima.core.history import HistoryManager
 from minima.core.logger import logger
 from minima.core.queue import PersistentQueue
 from minima.core.scraper import Scraper
@@ -32,12 +34,20 @@ def load_config(config_path=None):
 
 
 def main(config_path: str = None):
-    logger.info("=== DÉMARRAGE MINIMA v1.0 (Phase 5) ===")
+    logger.info("=== DÉMARRAGE MINIMA v1.0 (Phase 01) ===")
 
     try:
         ensure_paths()
         cfg = load_config(config_path)
 
+        # --- INITIALISATION MODE ET MODULES INTELLIGENCE/HISTORY ---
+        mode = cfg.get("mode", "scrap")                 # scrap / crawl / crawl_and_scrap
+        max_depth = cfg.get("max_depth", 2)            # profondeur pour crawl
+        logger.info(f"Pipeline mode: {mode}, max_depth: {max_depth}")
+
+        intelligence = IntelligenceManager()          # scoring basique
+        history = HistoryManager()                     
+        
         # Validation et chargement sécurisé des plugins
         logger.info(f"Validation des plugins dans {PLUGIN_DIR}")
         valid_plugins = validate_all(PLUGIN_DIR)
