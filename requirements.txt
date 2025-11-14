@@ -8,3 +8,4 @@ pandas
 watchdog
 pydantic
 typer
+langdetect

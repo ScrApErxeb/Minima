@@ -3,17 +3,26 @@
 
 # Mode d’exécution : "scrap", "crawl", "scrap+crawl"
 mode: "crawl"
-max_depth: 1  # pour le crawl
+max_depth: 2  # pour le crawl
+max_links_per_page: 10  # pour le crawl
 
 
 # Mode parallèle
 parallel: true
 max_workers: 5  # nombre maximal de threads simultanés
 
+accept_languages:
+  - en
+  - fr
+  
 
 # Liste d’URLs à traiter
 urls:
+ - "https://www.wikipedia.org/"
+ - "https://fr.wikipedia.org/wiki/Burkina_Faso"
+ - "https://fr.wikipedia.org/wiki/Mali"
  - "https://example.com"
+ - "https://iana.org/domains/example"
   
 # Paramètres réseau
 timeout: 10

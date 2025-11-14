@@ -1,4 +1,3 @@
-# minima/core/queue.py
 import os
 import json
 from minima.core.logger import logger
@@ -6,7 +5,7 @@ from minima.core.logger import logger
 class PersistentQueue:
     def __init__(self, path):
         self.path = path
-        # Ajout d'un dictionnaire pour stocker le score de chaque URL
+        # Chaque item est un dict {"url": ..., "depth": ..., "score": ...}
         self.data = {"pending": [], "processed": [], "scores": {}}
         self._load()
 
@@ -14,28 +13,16 @@ class PersistentQueue:
         if os.path.exists(self.path):
             try:
                 with open(self.path, "r", encoding="utf-8") as f:
-                    self.data.update(json.load(f))
-
-                # Correction ancienne structure
-                if "queue" in self.data:
-                    self.data["pending"] = self.data.pop("queue")
-                
-                if "processed" not in self.data:
-                    self.data["processed"] = []
-
-                if "scores" not in self.data:
-                    self.data["scores"] = {}
-
-                # Synchronisation pending / processed
-                self.data["pending"] = [url for url in self.data["pending"] if url not in self.data["processed"]]
-
+                    loaded = json.load(f)
+                    self.data["pending"] = loaded.get("pending", [])
+                    self.data["processed"] = loaded.get("processed", [])
+                    self.data["scores"] = loaded.get("scores", {})
+                # Nettoyage pour éviter les doublons
+                self.data["pending"] = [item for item in self.data["pending"] if item not in self.data["processed"]]
                 self._save()
-
-                logger.info(
-                    f"Queue chargée depuis {self.path} "
-                    f"({len(self.data['pending'])} en attente, "
-                    f"{len(self.data['processed'])} traitées)"
-                )
+                logger.info(f"Queue chargée depuis {self.path} "
+                            f"({len(self.data['pending'])} en attente, "
+                            f"{len(self.data['processed'])} traitées)")
             except Exception as e:
                 logger.warning(f"Échec du chargement de la queue: {e}")
         else:
@@ -50,30 +37,31 @@ class PersistentQueue:
             logger.error(f"Erreur lors de la sauvegarde de la queue: {e}")
 
     def add(self, item, score=0):
-        """Ajoute une URL à la queue avec un score (priorité)."""
+        """Ajoute un item dict à la queue si il n’existe pas déjà."""
         if item not in self.data["pending"] and item not in self.data["processed"]:
             self.data["pending"].append(item)
-            self.data["scores"][item] = score
-            logger.info(f"Added to queue: {item} with score {score}")
+            self.data["scores"][item["url"]] = score
+            logger.info(f"Added to queue: {item}")
             self._save()
 
     def get(self):
-        """Récupère l'URL avec le score le plus élevé."""
+        """Récupère l’item avec le score le plus élevé."""
         if self.is_empty():
             return None
-        # Trier pending par score décroissant
-        self.data["pending"].sort(key=lambda u: self.data["scores"].get(u, 0), reverse=True)
+        # Trier par score
+        self.data["pending"].sort(key=lambda x: self.data["scores"].get(x["url"], 0), reverse=True)
         item = self.data["pending"].pop(0)
         self._save()
         return item
 
     def mark_processed(self, item):
-        if item in self.data["pending"]:
-            self.data["pending"].remove(item)
+        """Marque un item dict comme traité et nettoie pending."""
+        # Supprime toutes les occurences de cet item dans pending
+        self.data["pending"] = [i for i in self.data["pending"] if i != item]
         if item not in self.data["processed"]:
             self.data["processed"].append(item)
-            # On peut conserver ou supprimer le score si nécessaire
-            self.data["scores"].pop(item, None)
+            # Supprime le score
+            self.data["scores"].pop(item["url"], None)
             logger.info(f"Marqué comme traité: {item}")
         self._save()
 
@@ -85,10 +73,10 @@ class PersistentQueue:
         self._save()
         logger.info("Queue réinitialisée")
 
-    def remaining_urls(self) -> list[str]:
-        """Retourne toutes les URLs encore à traiter triées par score."""
+    def remaining_urls(self) -> list[dict]:
+        """Retourne les items dict encore à traiter, triés par score."""
         return sorted(
             self.data.get("pending", []),
-            key=lambda u: self.data["scores"].get(u, 0),
+            key=lambda x: self.data["scores"].get(x["url"], 0),
             reverse=True
         )

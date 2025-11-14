@@ -15,6 +15,22 @@ class Scraper:
         self.max_workers = int(get("max_workers", 5))
         self.retries = int(get("retries", 3))
 
+    def fetch_preview(self, url: str, max_chars: int = 5000) -> str:
+        """Récupère seulement un extrait du HTML pour détecter la langue."""
+        try:
+            resp = requests.get(url, headers=self.headers, timeout=self.timeout, stream=True)
+            resp.raise_for_status()
+            preview = ""
+            for chunk in resp.iter_content(chunk_size=1024, decode_unicode=True):
+                preview += chunk
+                if len(preview) >= max_chars:
+                    break
+            logger.info(f"Preview fetched {url} ({len(preview)} chars)")
+            return preview
+        except requests.RequestException as e:
+            logger.warning(f"Échec du preview pour {url}: {e}")
+            return ""
+
     def fetch_html(self, url: str):
         """Télécharge une page avec gestion de retry."""
         for attempt in range(1, self.retries + 1):

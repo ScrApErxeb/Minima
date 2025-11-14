@@ -1,5 +1,7 @@
-# minima/core/generic_analyzer.py
 from bs4 import BeautifulSoup
+from langdetect import detect, DetectorFactory
+
+DetectorFactory.seed = 0  # pour résultats reproductibles
 
 class GenericAnalyzer:
     def __init__(self, logger=None):
@@ -27,3 +29,16 @@ class GenericAnalyzer:
             if self.logger:
                 self.logger.warning(f"Échec de l’analyse pour {url}: {e}")
             return {"url": url, "error": str(e)}
+
+    def detect_language(self, html):
+        """Détecte la langue du contenu HTML"""
+        try:
+            text = self.extract_text(html)
+            return detect(text)
+        except Exception:
+            return "unknown"
+
+    def extract_text(self, html):
+        """Extrait le texte brut du HTML"""
+        soup = BeautifulSoup(html, "lxml")
+        return soup.get_text(separator=" ", strip=True)
