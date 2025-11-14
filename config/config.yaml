@@ -1,15 +1,20 @@
 # config/config.yaml
 
-# Configuration pour le scraper Minima
-mode: "scrap" 
+
+# Mode d’exécution : "scrap", "crawl", "scrap+crawl"
+mode: "crawl"
+max_depth: 1  # pour le crawl
+
+
+# Mode parallèle
+parallel: true
+max_workers: 5  # nombre maximal de threads simultanés
 
 
 # Liste d’URLs à traiter
 urls:
-  - https://fr.wikipedia.org/wiki/France
-  - https://fr.wikipedia.org/wiki/Allemagne
-  - https://fr.wikipedia.org/wiki/Burkina_Faso
-
+ - "https://example.com"
+  
 # Paramètres réseau
 timeout: 10
 retries: 3
@@ -25,11 +30,6 @@ headers:
   Upgrade-Insecure-Requests: "1"
   Referer: "https://www.google.com/"
 
-
-
-# Mode parallèle
-parallel: true
-max_workers: 5  # nombre maximal de threads simultanés
 
 # Export
 export_prefix: "results"
