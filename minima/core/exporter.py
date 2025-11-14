@@ -61,37 +61,40 @@ class Exporter:
         return path
 
     def save_sqlite(self, data: list[dict], filename: str | None = None, table_name: str = "results") -> Path:
-        """Exporte les résultats en base de données SQLite (crawl du jour)."""
+        """Exporte les résultats en base SQLite avec ajout automatique des nouvelles colonnes."""
 
-        # Nom par défaut basé sur la date du jour
         if filename is None:
-            date_str = datetime.now().strftime("%Y%m%d")  # ex: 20251112
+            date_str = datetime.now().strftime("%Y%m%d")
             filename = f"crawl_{date_str}.db"
 
-        path = EXPORT_DB_DIR / filename
+        path = self.output_db_dir / filename
         path.parent.mkdir(parents=True, exist_ok=True)
 
         conn = sqlite3.connect(path)
         cursor = conn.cursor()
 
         if not data:
-            # Crée la base vide si aucun résultat
             conn.close()
             return path
 
-        # Détection des colonnes à partir du premier dictionnaire
+        # Crée la table si elle n'existe pas (avec les colonnes du premier dictionnaire)
         columns = data[0].keys()
         col_defs = ", ".join(f"{col} TEXT" for col in columns)
-
-        # Création de la table si elle n'existe pas
         cursor.execute(f"CREATE TABLE IF NOT EXISTS {table_name} ({col_defs})")
 
-        # Insertion ou update (upsert)
+        # --- Ajout dynamique des colonnes manquantes ---
+        cursor.execute(f"PRAGMA table_info({table_name})")
+        existing_cols = [col[1] for col in cursor.fetchall()]
+
+        for col in columns:
+            if col not in existing_cols:
+                cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {col} TEXT")
+
+        # Insertion ou update
         for row in data:
             placeholders = ", ".join("?" for _ in columns)
             cols = ", ".join(columns)
-            values = tuple(str(row[col]) for col in columns)
-            # Upsert: si clé unique existe, remplace l'entrée
+            values = tuple(str(row.get(col, "")) for col in columns)
             cursor.execute(f"INSERT OR REPLACE INTO {table_name} ({cols}) VALUES ({placeholders})", values)
 
         conn.commit()

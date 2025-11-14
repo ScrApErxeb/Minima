@@ -6,6 +6,8 @@ mode: "scrap"
 
 # Liste d’URLs à traiter
 urls:
+  - https://fr.wikipedia.org/wiki/France
+  - https://fr.wikipedia.org/wiki/Allemagne
   - https://fr.wikipedia.org/wiki/Burkina_Faso
 
 # Paramètres réseau

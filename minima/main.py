@@ -47,7 +47,7 @@ def main(config_path: str = None):
 
         intelligence = IntelligenceManager()          # scoring basique
         history = HistoryManager()                     
-        
+
         # Validation et chargement sécurisé des plugins
         logger.info(f"Validation des plugins dans {PLUGIN_DIR}")
         valid_plugins = validate_all(PLUGIN_DIR)
@@ -74,7 +74,6 @@ def main(config_path: str = None):
                 logger.warning("Aucune URL dans la configuration")
 
         logger.info("Début du traitement des URLs")
-
         urls_to_fetch = queue.remaining_urls()
         if not urls_to_fetch:
             logger.warning("Aucune URL à traiter")
@@ -87,9 +86,10 @@ def main(config_path: str = None):
                 logger.warning(f"Contenu vide ou échec pour {url}")
                 continue
 
+            # Analyse de la page
             result = analyzer.analyze(html, url)
 
-           # Application des plugins validés
+            # Application des plugins validés
             for plugin_module in valid_plugins:
                 plugin_name = getattr(plugin_module, "__name__", "unknown")
                 try:
@@ -102,6 +102,11 @@ def main(config_path: str = None):
                 except Exception as e:
                     logger.warning(f"Erreur plugin {plugin_name}: {e}")
 
+            # --- Phase Intelligence ---
+            result['score'] = intelligence.score_page(result)
+
+            # --- Historique ---
+            history.save_page_features(result)
 
             results.append(result)
             queue.mark_processed(url)
@@ -111,6 +116,7 @@ def main(config_path: str = None):
                 logger.info(f"Pause de {delay}s avant la prochaine URL")
                 time.sleep(delay)
 
+        # Exportation des résultats
         if results:
             logger.info(f"Exportation de {len(results)} résultats")
             exporter.export_results(results)
@@ -118,7 +124,6 @@ def main(config_path: str = None):
             logger.warning("Aucun résultat à exporter")
 
         logger.info("=== FIN DU PIPELINE MINIMA ===")
-
     except MinimaError as e:
         logger.error(f"Erreur Minima détectée: {e}")
     except Exception as e:
