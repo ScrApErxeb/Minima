@@ -21,9 +21,32 @@ def _timestamp() -> str:
 class Exporter:
     """Gère l'écriture des résultats au format JSON, CSV et SQLite."""
 
-    def __init__(self, output_dir: Path = EXPORT_DIR, output_db_dir : Path = EXPORT_DB_DIR) -> None:
-        self.output_dir = output_dir
-        self.output_db_dir = output_db_dir
+    def __init__(self, output_dir: Path = EXPORT_DIR, output_db_dir: Path = EXPORT_DB_DIR,
+                    flush_every: int = 10) -> None:
+            self.output_dir = output_dir
+            self.output_db_dir = output_db_dir
+            self.flush_every = max(1, flush_every)
+            self._buffer = []
+
+    def _flush_buffer(self):
+        if self._buffer:
+            self.save_json(self._buffer, f"results_flush_{_timestamp()}.json")
+            self.save_csv(self._buffer, f"results_flush_{_timestamp()}.csv")
+            self.save_sqlite(self._buffer, f"results_flush.db", table_name="results")
+            logger.info(f"Flush effectué pour {len(self._buffer)} items")
+            self._buffer.clear()
+
+    def add_results(self, results: Iterable[Mapping[str, Any]]):
+        self._buffer.extend(results)
+        if len(self._buffer) >= self.flush_every:
+            self._flush_buffer()
+
+    def flush(self):
+        if not self._buffer:
+            return
+        logger.info(f"Flush {len(self._buffer)} résultats vers JSON/CSV/SQLite")
+        self.export_results(self._buffer)
+        self._buffer.clear()
 
     def save_json(self, data: Iterable[Mapping[str, Any]], filename: str | None = None) -> Path:
         filename = filename or f"results_{_timestamp()}.json"
@@ -70,36 +93,41 @@ class Exporter:
         path = self.output_db_dir / filename
         path.parent.mkdir(parents=True, exist_ok=True)
 
+        if not data:
+            return path
+
+        # --- Collecte toutes les colonnes possibles dans tous les items ---
+        all_columns = set()
+        for row in data:
+            all_columns.update(row.keys())
+        all_columns = list(all_columns)
+
         conn = sqlite3.connect(path)
         cursor = conn.cursor()
 
-        if not data:
-            conn.close()
-            return path
-
-        # Crée la table si elle n'existe pas (avec les colonnes du premier dictionnaire)
-        columns = data[0].keys()
-        col_defs = ", ".join(f"{col} TEXT" for col in columns)
+        # Crée la table si elle n'existe pas
+        col_defs = ", ".join(f"{col} TEXT" for col in all_columns)
         cursor.execute(f"CREATE TABLE IF NOT EXISTS {table_name} ({col_defs})")
 
-        # --- Ajout dynamique des colonnes manquantes ---
+        # Vérifie les colonnes existantes pour ajouter les nouvelles
         cursor.execute(f"PRAGMA table_info({table_name})")
         existing_cols = [col[1] for col in cursor.fetchall()]
 
-        for col in columns:
+        for col in all_columns:
             if col not in existing_cols:
                 cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {col} TEXT")
 
-        # Insertion ou update
+        # Insère toutes les lignes
         for row in data:
-            placeholders = ", ".join("?" for _ in columns)
-            cols = ", ".join(columns)
-            values = tuple(str(row.get(col, "")) for col in columns)
+            placeholders = ", ".join("?" for _ in all_columns)
+            cols = ", ".join(all_columns)
+            values = tuple(str(row.get(col, "")) for col in all_columns)
             cursor.execute(f"INSERT OR REPLACE INTO {table_name} ({cols}) VALUES ({placeholders})", values)
 
         conn.commit()
         conn.close()
         return path
+
 
     def export_results(self, results: Iterable[Mapping[str, Any]], prefix: str = "results") -> tuple[Path, Path, Path]:
         timestamp = _timestamp()
@@ -109,7 +137,7 @@ class Exporter:
         db_path = self.save_sqlite(results, f"{prefix}_{jour}.db", table_name=prefix)
         return json_path, csv_path, db_path
 
-
+    
 # --- Compatibilité rétroactive avec l'ancien appel ---
 def export_results(results: Iterable[Mapping[str, Any]], prefix: str = "results") -> tuple[Path, Path, Path]:
     """

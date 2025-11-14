@@ -11,18 +11,17 @@ max_links_per_page: 10  # pour le crawl
 parallel: true
 max_workers: 5  # nombre maximal de threads simultanés
 
-accept_languages:
+queue_flush_every: 5  # vider la file d’attente après ce nombre de pages traitées
+export_flush_every: 10  # exporter les résultats après ce nombre de pages traitées
+
+accepted_languages:
   - en
   - fr
   
 
 # Liste d’URLs à traiter
 urls:
- - "https://www.wikipedia.org/"
- - "https://fr.wikipedia.org/wiki/Burkina_Faso"
- - "https://fr.wikipedia.org/wiki/Mali"
- - "https://example.com"
- - "https://iana.org/domains/example"
+ - "https://www.lefaso.net"
   
 # Paramètres réseau
 timeout: 10

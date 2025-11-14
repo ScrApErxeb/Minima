@@ -1,5 +1,3 @@
-import signal
-import sys
 import os
 import time
 import yaml
@@ -33,6 +31,8 @@ def load_config(config_path=None):
         logger.error(f"Erreur lors du chargement de la config: {e}")
         return {}
 
+import signal
+
 def main(config_path: str = None):
     logger.info("=== DÉMARRAGE MINIMA v2.4 (Mode intelligent) ===")
     try:
@@ -43,10 +43,13 @@ def main(config_path: str = None):
         max_depth = int(cfg.get("max_depth", 1))
         delay = cfg.get("delay", 0)
         accepted_languages = cfg.get("accepted_languages", ["en"])
-
         logger.info(f"Pipeline mode: {mode}, max_depth: {max_depth}, accepted_languages: {accepted_languages}")
 
-        # Validation et chargement sécurisé des plugins
+        export_flush_every = int(cfg.get("export_flush_every", 10))
+
+        logger.info(f"Pipeline mode: {mode}, max_depth: {max_depth}, "
+                    f"accepted_languages: {accepted_languages}, export_flush_every: {export_flush_every}")
+
         valid_plugins = validate_all(PLUGIN_DIR)
         logger.info(f"{len(valid_plugins)} plugin(s) validé(s) et prêt(s) à l'emploi")
 
@@ -54,22 +57,22 @@ def main(config_path: str = None):
         os.makedirs(os.path.dirname(QUEUE_PATH), exist_ok=True)
         queue = PersistentQueue(QUEUE_PATH)
         analyzer = GenericAnalyzer(logger=logger)
-        exporter = Exporter()
+        exporter = Exporter(flush_every=export_flush_every)
         scraper = Scraper()
 
-        def handle_exit(signum, frame):
-            logger.warning("Ctrl+C détecté, sauvegarde de la queue et arrêt...")
-            queue._save()
-            sys.exit(0)
-
-        signal.signal(signal.SIGINT, handle_exit)
-        signal.signal(signal.SIGTERM, handle_exit)
-
-        # Ajouter les URLs initiales à la queue
         for url in urls:
             queue.add({"url": url, "depth": 0, "score": 0})
 
         results = []
+
+        # Gestion Ctrl+C
+        def handle_sigint(sig, frame):
+            logger.warning("Interrupt reçu, flush final en cours...")
+            exporter.flush()
+            logger.info("Flush final terminé, arrêt du pipeline.")
+            exit(0)
+
+        signal.signal(signal.SIGINT, handle_sigint)
 
         while not queue.is_empty():
             urls_to_fetch = queue.remaining_urls()
@@ -77,13 +80,11 @@ def main(config_path: str = None):
                 logger.info("Plus d'URLs à traiter")
                 break
 
-            # Récupération HTML pour chaque URL
             html_map = scraper.fetch_all([item["url"] for item in urls_to_fetch])
 
             for item in urls_to_fetch:
                 url = item["url"]
                 depth = item["depth"]
-                score = item.get("score", 0)
                 html = html_map.get(url)
 
                 if not html:
@@ -91,58 +92,47 @@ def main(config_path: str = None):
                     queue.mark_processed(item)
                     continue
 
-                # Détection de la langue
                 lang = analyzer.detect_language(html)
                 if lang not in accepted_languages:
                     logger.info(f"Ignoré {url} car langue {lang} non acceptée")
                     queue.mark_processed(item)
                     continue
 
-                # Analyse complète
                 result = analyzer.analyze(html, url)
+                result['score'] = item.get('score', 0)  # <-- Ajoute le score ici
 
-                # Application des plugins validés
+
                 for plugin_module in valid_plugins:
                     try:
                         if hasattr(plugin_module, "process"):
                             plugin_result = plugin_module.process(url, html)
                             if plugin_result:
                                 result.update(plugin_result)
-                        else:
-                            logger.warning(f"Plugin {getattr(plugin_module, '__name__', 'unknown')} n’a pas de méthode process()")
                     except Exception as e:
                         logger.warning(f"Erreur plugin {getattr(plugin_module, '__name__', 'unknown')}: {e}")
 
-                results.append(result)
                 queue.mark_processed(item)
                 logger.info(f"Analyse terminée pour {url}")
 
-                # Crawl des liens si mode crawl et profondeur autorisée
+                # Ajout au buffer et flush si nécessaire
+                exporter.add_results([result])
+
                 if "crawl" in mode and depth < max_depth:
                     links = result.get("links", [])
                     for link in links:
                         full_url = urljoin(url, link)
-
-                        # Fetch léger pour détection de langue
                         preview_html = scraper.fetch_preview(full_url)
                         lang = analyzer.detect_language(preview_html)
-
                         if lang in accepted_languages:
                             queue.add({"url": full_url, "depth": depth + 1, "score": 0})
                         else:
                             logger.info(f"Ignoré {full_url} car langue {lang} non acceptée")
 
-                # Pause éventuelle
                 if delay > 0:
                     time.sleep(delay)
 
-        # Export des résultats
-        if results:
-            logger.info(f"Exportation de {len(results)} résultats")
-            exporter.export_results(results)
-        else:
-            logger.warning("Aucun résultat à exporter")
-
+        # Flush final pour tout ce qui reste dans le buffer
+        exporter.flush()
         logger.info("=== FIN DU PIPELINE MINIMA ===")
 
     except MinimaError as e:

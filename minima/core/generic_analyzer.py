@@ -30,11 +30,16 @@ class GenericAnalyzer:
                 self.logger.warning(f"Échec de l’analyse pour {url}: {e}")
             return {"url": url, "error": str(e)}
 
-    def detect_language(self, html):
-        """Détecte la langue du contenu HTML"""
+    def detect_language(self, html: str) -> str:
         try:
-            text = self.extract_text(html)
-            return detect(text)
+            # D'abord tenter avec l'attribut lang du HTML
+            soup = BeautifulSoup(html, "html.parser")
+            html_tag = soup.find("html")
+            if html_tag and html_tag.get("lang"):
+                return html_tag["lang"].split("-")[0].lower()
+            
+            # Ensuite détection automatique classique
+            return self._detect_with_library(html)
         except Exception:
             return "unknown"
 
