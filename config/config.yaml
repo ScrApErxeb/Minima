@@ -1,5 +1,9 @@
 # config/config.yaml
- 
+
+# Configuration pour le scraper Minima
+mode: "scrap" 
+
+
 # Liste d’URLs à traiter
 urls:
   - https://fr.wikipedia.org/wiki/Burkina_Faso
