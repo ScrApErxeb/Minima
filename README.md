@@ -46,7 +46,7 @@ python -m minima
 
 Linux / macOS (bash/zsh)
 ```bash
-git clone https://github.com/mon-orga/Minima.git
+git clone https://github.com/ScrApErxeb/Minima.git
 cd Minima
 python3 -m venv .venv
 source .venv/bin/activate
@@ -58,4 +58,3 @@ python -m minima  # ou python main.py selon le projet
 Remarques:
 - Si le projet n'est pas en Python, adaptez la création d'environnement et l'installation (ex. npm, go, cargo).
 - Ajustez le chemin et le nom du point d'entrée si nécessaire.
-- Pour exécuter plusieurs commandes en une sélection, sélectionner simplement le bloc correspondant à votre OS.
