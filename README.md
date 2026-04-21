@@ -1,60 +1,87 @@
-# Minima v0.9
+# 🕵️ Minima v0.9
+**Framework de Crawling modulaire et extensible.**
 
-Minima est un framework modulaire de Crawling extensible par plugins.
+Minima est un framework robuste conçu pour le scraping intensif, reposant sur une architecture orientée plugins qui sépare la collecte, l'analyse et l'exportation des données.
 
-## Fonctionnalités principales
-- Système de configuration dynamique (`config/config.yaml`)
-- Scraping multi-threads configurable
-- Analyse générique et par plugin
-- Système de queue persistant
-- Export JSON/CSV incrémental ou en fin d’exécution
-- Logs rotatifs configurables
-- Pipeline de traitement multi-plugins
-- Métriques globales (succès, échecs, latence, taille, RPS)
+---
 
-## Initialisation & Installation
+## 🚀 Fonctionnalités Clés
 
-Suivez ces étapes selon votre système (Windows / Linux / macOS). Remplacez l'URL du dépôt si nécessaire.
+* **Architecture Modulaire :** Pipeline de traitement extensible via le système de plugins (`minima/plugins/`).
+* **Performance :** Scraping multi-threadé avec gestion de file d'attente (**Queue**) persistante.
+* **Configuration Dynamique :** Gestion avancée via YAML (`config/config.yaml`).
+* **Observabilité :** Métriques en temps réel (RPS, latence, succès/échecs) et logs rotatifs automatisés.
+* **Export Flexible :** Support incrémental pour les formats JSON et CSV.
+* **Sécurité :** Système de validation de plugins et hachage de sécurité.
 
-1. Cloner le dépôt et se placer dans le projet
-2. Créer et activer un environnement virtuel (Python)
-3. Installer les dépendances
-4. Copier le fichier de configuration exemple
-5. Lancer l'application (ajuster l'entrée si nécessaire)
+---
 
-Windows (PowerShell)
-```powershell
-git clone https://github.com/mon-orga/Minima.git
+## 🛠️ Installation & Configuration
+
+### 1. Cloner le projet
+```bash
+git clone [https://github.com/ScrApErxeb/Minima.git](https://github.com/ScrApErxeb/Minima.git)
 cd Minima
-py -3 -m venv .venv
+
+2. Préparer l'environnement
+
+Choisissez la méthode adaptée à votre système :
+🪟 Windows (PowerShell)
+PowerShell
+
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-Copy-Item config\config.example.yaml config\config.yaml
-python -m minima  # ou python main.py selon le projet
-```
+Copy-Item config\default.yaml config\config.yaml
 
-Windows (CMD)
-```cmd
-git clone https://github.com/mon-orga/Minima.git
-cd Minima
-py -3 -m venv .venv
-.venv\Scripts\activate.bat
-pip install -r requirements.txt
-copy config\config.example.yaml config\config.yaml
-python -m minima
-```
+🐧 Linux / 🍎 macOS
+Bash
 
-Linux / macOS (bash/zsh)
-```bash
-git clone https://github.com/ScrApErxeb/Minima.git
-cd Minima
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp config/config.example.yaml config/config.yaml
-python -m minima  # ou python main.py selon le projet
-```
+cp config/default.yaml config/config.yaml
 
-Remarques:
-- Si le projet n'est pas en Python, adaptez la création d'environnement et l'installation (ex. npm, go, cargo).
-- Ajustez le chemin et le nom du point d'entrée si nécessaire.
+🚦 Commande de Lancement
+
+Pour garantir la résolution correcte des modules internes (core, utils, plugins), utilisez la commande suivante à la racine du projet :
+Mode Standard (Recommandé)
+
+Exécute le projet en tant que module Python :
+Bash
+
+python -m minima.main
+
+Mode Interface (CLI)
+
+Si vous utilisez le point d'entrée CLI racine :
+Bash
+
+python cli.py
+
+Mode Docker
+Bash
+
+docker build -t minima .
+docker run --rm minima
+
+📂 Structure du Projet
+
+    minima/core/ : Le cœur du moteur (Scraper, Manager, Intelligence).
+
+    minima/plugins/ : Vos analyseurs et extensions personnalisés.
+
+    config/ : Fichiers de configuration YAML.
+
+    logs/ : Sorties de logs et historiques d'exécution.
+
+    tests/ : Suite complète de tests unitaires (via pytest).
+
+🧪 Tests
+
+Pour lancer la suite de tests et vérifier l'intégrité du système :
+Bash
+
+pytest
+
+© 2026 Minima Framework - Modulaire, Rapide, Efficace.

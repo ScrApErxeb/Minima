@@ -1,7 +1,8 @@
 import os
 import time
 import yaml
-from urllib.parse import urljoin
+import signal
+from urllib.parse import urljoin, urlparse
 
 from minima.core.logger import logger
 from minima.core.queue import PersistentQueue
@@ -12,133 +13,131 @@ from minima.core.config_loader import ensure_paths
 from minima.core.errors import MinimaError
 from minima.plugins.plugin_validator import validate_all
 
+# --- Configuration des Chemins ---
 CONFIG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../config/config.yaml"))
 QUEUE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/queue.json"))
 PLUGIN_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "plugins"))
 
+def normalize_url(url: str) -> str:
+    """Nettoie l'URL pour éviter les doublons techniques."""
+    parsed = urlparse(url)
+    # On garde le schéma, le netloc et le path, on vire les fragments (#) et les query params si besoin
+    normalized = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+    if normalized.endswith("/") and len(parsed.path) > 1:
+        normalized = normalized[:-1]
+    return normalized.lower().strip()
+
 def load_config(config_path=None):
     config_file = config_path or CONFIG_PATH
-    logger.info(f"Tentative de chargement du fichier de config: {config_file}")
     if not os.path.exists(config_file):
-        logger.warning(f"Config file not found: {config_file}")
+        logger.warning(f"Config non trouvée : {config_file}")
         return {}
     try:
         with open(config_file, "r", encoding="utf-8") as f:
-            cfg = yaml.safe_load(f) or {}
-        logger.info(f"Configuration chargée avec succès ({len(cfg)} clés)")
-        return cfg
+            return yaml.safe_load(f) or {}
     except Exception as e:
-        logger.error(f"Erreur lors du chargement de la config: {e}")
+        logger.error(f"Erreur config : {e}")
         return {}
 
-import signal
-
 def main(config_path: str = None):
-    logger.info("=== DÉMARRAGE MINIMA v2.4 (Mode intelligent) ===")
+    logger.info("=== MINIMA V1.0 : LANCEMENT OFFICIEL ===")
     try:
         ensure_paths()
         cfg = load_config(config_path)
 
+        # Paramètres
         mode = cfg.get("mode", "scrap")
         max_depth = int(cfg.get("max_depth", 1))
         delay = cfg.get("delay", 0)
-        accepted_languages = cfg.get("accepted_languages", ["en"])
-        logger.info(f"Pipeline mode: {mode}, max_depth: {max_depth}, accepted_languages: {accepted_languages}")
-
+        accepted_languages = cfg.get("accepted_languages", ["en", "fr"])
         export_flush_every = int(cfg.get("export_flush_every", 10))
 
-        logger.info(f"Pipeline mode: {mode}, max_depth: {max_depth}, "
-                    f"accepted_languages: {accepted_languages}, export_flush_every: {export_flush_every}")
-
+        # Initialisation
         valid_plugins = validate_all(PLUGIN_DIR)
-        logger.info(f"{len(valid_plugins)} plugin(s) validé(s) et prêt(s) à l'emploi")
-
-        urls = cfg.get("urls", [])
-        os.makedirs(os.path.dirname(QUEUE_PATH), exist_ok=True)
         queue = PersistentQueue(QUEUE_PATH)
         analyzer = GenericAnalyzer(logger=logger)
         exporter = Exporter(flush_every=export_flush_every)
         scraper = Scraper()
 
-        for url in urls:
-            queue.add({"url": url, "depth": 0, "score": 0})
+        # URLs de départ avec normalisation
+        for url in cfg.get("urls", []):
+            queue.add({"url": normalize_url(url), "depth": 0, "score": 0})
 
-        results = []
-
-        # Gestion Ctrl+C
+        # Gestion interruption
+# --- Gestion interruption (PLACER JUSTE AVANT LA BOUCLE WHILE) ---
         def handle_sigint(sig, frame):
-            logger.warning("Interrupt reçu, flush final en cours...")
-            exporter.flush()
-            logger.info("Flush final terminé, arrêt du pipeline.")
-            exit(0)
+            # Utilisation de print pour un feedback visuel immédiat
+            print("\n" + "!"*30)
+            print("  INTERRUPTION DÉTECTÉE (Ctrl+C)")
+            print("  Sauvegarde finale des données...")
+            print("!"*30)
+            
+            try:
+                exporter.flush()
+                print("✅ Données exportées avec succès.")
+            except Exception as e:
+                print(f"❌ Erreur lors du flush final : {e}")
+            
+            print("👋 Arrêt de Minima. À bientôt !")
+            # On utilise os._exit pour tuer tous les threads immédiatement
+            os._exit(0)
 
         signal.signal(signal.SIGINT, handle_sigint)
-
+        
+        # Boucle de traitement
         while not queue.is_empty():
-            urls_to_fetch = queue.remaining_urls()
-            if not urls_to_fetch:
-                logger.info("Plus d'URLs à traiter")
-                break
+            items_to_fetch = queue.remaining_urls()
+            if not items_to_fetch: break
 
-            html_map = scraper.fetch_all([item["url"] for item in urls_to_fetch])
+            # Récupération groupée
+            html_map = scraper.fetch_all([item["url"] for item in items_to_fetch])
 
-            for item in urls_to_fetch:
-                url = item["url"]
-                depth = item["depth"]
+            for item in items_to_fetch:
+                url, depth = item["url"], item["depth"]
                 html = html_map.get(url)
 
                 if not html:
-                    logger.warning(f"Contenu vide ou échec pour {url}")
                     queue.mark_processed(item)
                     continue
 
+                # Filtrage langue
                 lang = analyzer.detect_language(html)
                 if lang not in accepted_languages:
-                    logger.info(f"Ignoré {url} car langue {lang} non acceptée")
+                    logger.info(f"Ignoré (Langue {lang}) : {url}")
                     queue.mark_processed(item)
                     continue
 
+                # Analyse technique + Plugins
                 result = analyzer.analyze(html, url)
-                result['score'] = item.get('score', 0)  # <-- Ajoute le score ici
+                result['score'] = item.get('score', 0)
 
-
-                for plugin_module in valid_plugins:
+                for plugin in valid_plugins:
                     try:
-                        if hasattr(plugin_module, "process"):
-                            plugin_result = plugin_module.process(url, html)
-                            if plugin_result:
-                                result.update(plugin_result)
+                        if hasattr(plugin, "process"):
+                            p_res = plugin.process(url, html)
+                            if p_res: result.update(p_res)
                     except Exception as e:
-                        logger.warning(f"Erreur plugin {getattr(plugin_module, '__name__', 'unknown')}: {e}")
+                        logger.warning(f"Erreur plugin {getattr(plugin, '__name__', 'plg')} : {e}")
 
+                # Fin de traitement & Export
                 queue.mark_processed(item)
-                logger.info(f"Analyse terminée pour {url}")
-
-                # Ajout au buffer et flush si nécessaire
                 exporter.add_results([result])
+                logger.info(f"OK ({lang}) : {url}")
 
+                # Découverte de liens & Déduplication
                 if "crawl" in mode and depth < max_depth:
-                    links = result.get("links", [])
-                    for link in links:
-                        full_url = urljoin(url, link)
-                        preview_html = scraper.fetch_preview(full_url)
-                        lang = analyzer.detect_language(preview_html)
-                        if lang in accepted_languages:
-                            queue.add({"url": full_url, "depth": depth + 1, "score": 0})
-                        else:
-                            logger.info(f"Ignoré {full_url} car langue {lang} non acceptée")
+                    for link in result.get("links", []):
+                        full_url = normalize_url(urljoin(url, link))
+                        # La queue gère déjà le 'if full_url not in processed' en interne
+                        queue.add({"url": full_url, "depth": depth + 1, "score": 0})
 
-                if delay > 0:
-                    time.sleep(delay)
+                if delay > 0: time.sleep(delay)
 
-        # Flush final pour tout ce qui reste dans le buffer
         exporter.flush()
-        logger.info("=== FIN DU PIPELINE MINIMA ===")
+        logger.info("=== TRAVAIL TERMINÉ ===")
 
-    except MinimaError as e:
-        logger.error(f"Erreur Minima détectée: {e}")
     except Exception as e:
-        logger.exception(f"Erreur critique non gérée: {e}")
+        logger.exception(f"Erreur fatale : {e}")
 
 if __name__ == "__main__":
     main()

@@ -21,7 +21,7 @@ accepted_languages:
 
 # Liste d’URLs à traiter
 urls:
- - "https://www.lefaso.net"
+ - "https://www.presidencedufaso.bf"
   
 # Paramètres réseau
 timeout: 10

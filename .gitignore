@@ -11,6 +11,7 @@ data/
 exports/
 databases/
 crawl_data/
+logs/
 
 # Distribution / packaging
 .Python
