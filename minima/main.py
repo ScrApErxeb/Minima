@@ -19,13 +19,31 @@ QUEUE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/qu
 PLUGIN_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "plugins"))
 
 def normalize_url(url: str) -> str:
-    """Nettoie l'URL pour éviter les doublons techniques."""
-    parsed = urlparse(url)
-    # On garde le schéma, le netloc et le path, on vire les fragments (#) et les query params si besoin
-    normalized = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
-    if normalized.endswith("/") and len(parsed.path) > 1:
-        normalized = normalized[:-1]
-    return normalized.lower().strip()
+    """Nettoie l'URL et filtre les protocoles non-HTTP (JS, Mail, etc.)."""
+    if not url:
+        return ""
+        
+    url_clean = url.lower().strip()
+    
+    # Filtrage immédiat des liens qui ne sont pas des pages web
+    if url_clean.startswith(("javascript:", "mailto:", "tel:", "data:", "#")):
+        return ""
+    
+    try:
+        parsed = urlparse(url)
+        # On ne traite que le Web (http/https)
+        if parsed.scheme not in ["http", "https"] and parsed.scheme != "":
+            return ""
+            
+        normalized = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+        
+        # Nettoyage des slashs de fin pour éviter les doublons techniques
+        if normalized.endswith("/") and len(parsed.path) > 1:
+            normalized = normalized[:-1]
+            
+        return normalized.lower().strip()
+    except Exception:
+        return ""
 
 def load_config(config_path=None):
     config_file = config_path or CONFIG_PATH
