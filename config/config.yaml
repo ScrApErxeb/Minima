@@ -3,7 +3,7 @@
 
 # Mode d’exécution : "scrap", "crawl", "scrap+crawl"
 mode: "crawl"
-max_depth: 1  # pour le crawl
+max_depth: 2  # pour le crawl
 max_links_per_page: 10  # pour le crawl
 
 
